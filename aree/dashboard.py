@@ -31,10 +31,18 @@ for svc in service_names:
     }
 
 # ─── Run Pipeline ───────────────────────────────────────
-result = run_aree_pipeline(services_data)
+use_real_threats = st.sidebar.checkbox("🌐 Use Real AbuseIPDB Data", value=False)
+
+result = run_aree_pipeline(services_data, use_real_threats=use_real_threats)
 re_scores     = result["re_scores"]
 forecasts     = result["forecasts"]
 interventions = result["interventions"]
+rl_decisions  = result.get("rl_decisions", {})
+
+if use_real_threats:
+    st.sidebar.success("✅ Using LIVE AbuseIPDB threat data!")
+else:
+    st.sidebar.info("📱 Mock threat data (add API key for real data)")
 
 # ─── RE Score Cards ─────────────────────────────────────
 st.markdown("## 📊 Current Risk Evolution Scores")

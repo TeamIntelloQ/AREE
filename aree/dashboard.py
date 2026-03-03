@@ -102,6 +102,49 @@ if interventions:
 else:
     st.success("✅ All services nominal — no intervention needed!")
 
+# ─── RL Decisions Table ─────────────────────────────────
+st.markdown("## 🤖 RL Agent Decisions")
+
+rl_decisions = result["rl_decisions"]
+
+rl_rows = []
+for svc, dec in rl_decisions.items():
+    re = re_scores[svc]
+    rl_rows.append({
+        "Service":  svc,
+        "RE Score": round(re, 2),
+        "RL Action": dec["action"],
+        "Reward":   dec["reward"]
+    })
+
+df_rl = pd.DataFrame(rl_rows).sort_values("RE Score", ascending=False)
+
+# Color-code the action column
+def color_action(val):
+    colors = {
+        "SCALE_UP": "background-color: #ff4444; color: white",
+        "ISOLATE":  "background-color: #ff8800; color: white",
+        "ALERT":    "background-color: #ffcc00; color: black",
+        "MONITOR":  "background-color: #44bb44; color: white"
+    }
+    return colors.get(val, "")
+
+st.dataframe(
+    df_rl.style.applymap(color_action, subset=["RL Action"]),
+    use_container_width=True
+)
+
+# ─── RL Reward Bar ──────────────────────────────────────
+fig_reward = px.bar(
+    df_rl,
+    x="Service",
+    y="Reward",
+    color="Reward",
+    color_continuous_scale=["red", "yellow", "green"],
+    title="RL Agent Reward per Service"
+)
+st.plotly_chart(fig_reward, use_container_width=True)
+
 # ─── Footer ─────────────────────────────────────────────
 st.markdown("---")
 st.caption("AREE v1.0 | AREE Hackathon 2026 | Built by Khitiz + Team")

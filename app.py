@@ -1,47 +1,66 @@
-from services.forecast import forecast_re  # ADD THIS
 import streamlit as st
 import json
-import networkx as nx
+import numpy as np
 import plotly.graph_objects as go
-from services.alerts import monitor_ip
-from services.graph_prop import propagate_risk  # Update import if needed
+import networkx as nx
+import matplotlib.pyplot as plt
+from re_engine import compute_re_score  # Your working engine!
 
 st.title("🚨 AREE — Risk Evolution Engine")
 
-# Load data
-events = json.load(open('data/sample_events.json'))
-services_re = {e['service']: monitor_ip(e['ip'], e['oss'], e['sts'], e['bcs'])/100 
-               for e in events}
+# Sidebar Controls
+st.sidebar.header("Chaos Simulator")
+latency_slider = st.sidebar.slider("Test Latency (ms)", 100, 5000, 2000)
+service_name = st.sidebar.text_input("Service", "api-svc-01")
 
-# Metrics
-st.metric("Max RE", f"{max(services_re.values()):.1%}")
-st.metric("Alerts", len([v for v in services_re.values() if v > 0.75]))
+# Real-time RE Calculation
+if st.sidebar.button("🔍 SCAN SERVICE"):
+    result = compute_re_score(service_name, latency_slider)
+    st.metric("RE Score", f"{result['re_score']:.1%}", delta=None)
+    st.metric("Status", result['aura_level'])
+    st.metric("Action", result['action'])
 
-# RE Bar Chart
-st.subheader("RE Scores")
-fig = go.Figure(data=[go.Bar(x=list(services_re.keys()), 
-                            y=list(services_re.values()))])
-st.plotly_chart(fig)
-# ADD THIS ENTIRE BLOCK:
-st.subheader("🔮 RE Forecast")
-re_history = list(services_re.values())[:5]  # Last 5 services
-future_re = forecast_re(re_history)
+# Chaos Test Button
+if st.sidebar.button("🚀 RUN CHAOS TEST (10 services)"):
+    st.subheader("Chaos Results")
+    alerts = 0
+    chaos_data = []
+    for i in range(10):
+        latency = np.random.uniform(500, 5000)
+        result = compute_re_score(f"SVC-{i}", latency)
+        chaos_data.append(result['re_score'])
+        status_emoji = "🔔" if result['re_score'] > 0.7 else "✅"
+        st.write(f"**SVC-{i}**: Latency={latency:.0f}ms → **RE={result['re_score']:.1%}** {status_emoji}")
+        if result['re_score'] > 0.7:
+            alerts += 1
+    
+    st.success(f"🎯 **{alerts}/10 AUTO-REMEDIATED!**")
+    
+    # RE Bar Chart
+    fig = go.Figure(data=[go.Bar(x=[f"SVC-{i}" for i in range(10)], 
+                                y=chaos_data, 
+                                marker_color=['red' if x>0.7 else 'green' for x in chaos_data])])
+    fig.update_layout(title="Risk Evolution Scores", yaxis_title="RE Score")
+    st.plotly_chart(fig)
 
-st.line_chart(future_re)
+# Live Risk Aura Heatmap
+st.subheader("🔴 Risk Aura Heatmap")
+mock_services = ["frontend", "api", "db", "cache", "auth"]
+mock_latencies = np.random.uniform(500, 4000, 5)
+service_scores = [compute_re_score(svc, lat)['re_score'] for svc, lat in zip(mock_services, mock_latencies)]
 
-max_future = max(future_re)
-if max_future > 0.75:
-    st.error(f"🚨 CRITICAL: Spike to {max_future:.1%} predicted!")
-else:
-    st.info("✅ Trajectory stable")
+fig_heatmap = go.Figure(data=go.Heatmap(
+    z=[service_scores],
+    x=mock_services,
+    y=["Current"],
+    colorscale='RdYlGn_r',
+    zmid=0.5
+))
+st.plotly_chart(fig_heatmap)
 
-# Risk Graph
-st.subheader("Propagation Graph")
-G = nx.DiGraph([("frontend","api"),("api","db")])
-risk_map = propagate_risk(G, services_re)
-pos = nx.spring_layout(G)
-nx.draw(G, pos, with_labels=True, node_color=list(risk_map.values()), 
-        node_size=[v*5000 for v in risk_map.values()])
-st.pyplot()
+# Alerts Summary
+high_risk = sum(1 for score in service_scores if score > 0.7)
+st.metric("🔔 High Risk Services", high_risk, delta=0)
 
-st.success("🎉 Backend → UI Complete!")
+st.success("🎉 AREE Live Demo — Backend → UI ✅")
+st.info("👈 Use sidebar to test latency → watch RE explode!")

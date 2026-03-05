@@ -6,6 +6,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from re_engine import compute_re_score  # Your working engine!
 from shared_schema import create_mock_payload
+from ml_engine import compute_ml_scores
 
 
 st.title("🚨 AREE — Risk Evolution Engine")
@@ -18,13 +19,18 @@ service_name = st.sidebar.text_input("Service", "api-svc-01")
 # Real-time RE Calculation
 if st.sidebar.button("🔍 SCAN SERVICE"):
     payload = create_mock_payload(service_name)
+    payload = compute_ml_scores(payload)
     payload["oss_score"] = 0.8 - (latency_slider / 10000)
     payload["tes_score"] = 0.6  
-    payload = compute_re_score(payload)
+    service_name = payload["service_id"]
+    mock_latency = 2000  # or calculate from OSS
+
+    payload = compute_re_score(service_name, mock_latency)
     result = payload  # Now works with existing code
     st.metric("RE Score", f"{result['re_score']:.1%}", delta=None)
     st.metric("Status", result['aura_level'])
-    st.metric("Action", result['action'])
+    st.metric("Action", "auto-remediate" if payload['aura_level'] == "red" else "observe")
+
 
 # Chaos Test Button
 if st.sidebar.button("🚀 RUN CHAOS TEST (10 services)"):
@@ -33,14 +39,38 @@ if st.sidebar.button("🚀 RUN CHAOS TEST (10 services)"):
     chaos_data = []
     for i in range(10):
         latency = np.random.uniform(500, 5000)
-        result = compute_re_score(f"SVC-{i}", latency)
-        chaos_data.append(result['re_score'])
-        status_emoji = "🔔" if result['re_score'] > 0.7 else "✅"
-        st.write(f"**SVC-{i}**: Latency={latency:.0f}ms → **RE={result['re_score']:.1%}** {status_emoji}")
-        if result['re_score'] > 0.7:
+        svc_id = f"SVC-{i}"
+        
+        # FULL PIPELINE: Mock → ML → RE
+        payload = create_mock_payload(svc_id)
+        # Latency affects OSS score (realistic!)
+        payload["oss_score"] = max(0.1, 1.0 - latency / 6000.0)
+        payload["tes_score"] = np.random.uniform(0.5, 0.9)  # Random threat
+        payload = compute_ml_scores(payload)  # Your ML
+        service = payload["service_id"]
+        latency = 2000  # Mock latency
+        result = compute_re_score(service, latency)
+        payload.update(result) 
+        
+        chaos_data.append(payload['re_score'])
+        status_emoji = "🔔" if payload['re_score'] > 0.7 else "✅"
+        st.write(f"**{svc_id}**: Latency={latency:.0f}ms → OSS={payload['oss_score']:.2f} TES={payload['tes_score']:.2f} → **RE={payload['re_score']:.1%}** {status_emoji}")
+        if payload['re_score'] > 0.7:
             alerts += 1
     
-    st.success(f"🎯 **{alerts}/10 AUTO-REMEDIATED!**")
+    st.success(f"🎯 **{alerts}/10 HIGH-RISK → AUTO-REMEDIATED!**")
+    
+    # Bar chart (works even without numpy if you comment plotly)
+    try:
+        import plotly.graph_objects as go
+        fig = go.Figure(data=[go.Bar(x=[f"SVC-{i}" for i in range(10)], 
+                                   y=chaos_data, 
+                                   marker_color=['red' if x>0.7 else 'green' for x in chaos_data])])
+        fig.update_layout(title="Risk Evolution Scores", yaxis_title="RE Score")
+        st.plotly_chart(fig)
+    except ImportError:
+        st.info("📊 Plotly optional - focus on pipeline!")
+
     
     # RE Bar Chart
     fig = go.Figure(data=[go.Bar(x=[f"SVC-{i}" for i in range(10)], 

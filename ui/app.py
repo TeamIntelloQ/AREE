@@ -10,12 +10,56 @@ from visuals.timeline import build_timeline_chart
 from visuals.graph_view import build_dependency_graph
 
 from core.mock_data import (
-    generate_service_metrics,
     generate_threat_ips,
     generate_incident_log,
-    compute_re_scores,
     get_intervention_suggestions
 )
+from shared_schema import ServicePayload
+from ml_engine import compute_ml_scores
+from re_engine import compute_re_pipeline
+
+SERVICES = [
+    "auth-service", "payment-gateway", "user-db", "api-gateway",
+    "notification-svc", "order-service", "inventory-db", "logging-svc",
+]
+
+def generate_real_data(n_services, scenario):
+    import random
+    rows = []
+    for svc in SERVICES[:n_services]:
+        payload = ServicePayload()
+        payload["service_id"] = svc
+        # Scenario-based raw inputs
+        if scenario == "DDoS Attack":
+            payload["oss_score"] = round(random.uniform(0.1, 0.35), 2)
+            payload["tes_score"] = round(random.uniform(0.7, 0.95), 2)
+        elif scenario == "Config Drift":
+            payload["oss_score"] = round(random.uniform(0.3, 0.55), 2)
+            payload["tes_score"] = round(random.uniform(0.4, 0.65), 2)
+        elif scenario == "Brute Force":
+            payload["oss_score"] = round(random.uniform(0.2, 0.5), 2)
+            payload["tes_score"] = round(random.uniform(0.75, 0.95), 2)
+        elif scenario == "Data Exfiltration":
+            payload["oss_score"] = round(random.uniform(0.15, 0.4), 2)
+            payload["tes_score"] = round(random.uniform(0.8, 0.99), 2)
+        else:  # Normal
+            payload["oss_score"] = round(random.uniform(0.5, 0.85), 2)
+            payload["tes_score"] = round(random.uniform(0.05, 0.3), 2)
+
+        payload = compute_ml_scores(payload)
+        payload = compute_re_pipeline(payload)
+
+        rows.append({
+            "service":    svc,
+            "cpu":        round(payload["oss_score"] * 100, 2),
+            "memory":     round(random.uniform(20, 90), 2),
+            "error_rate": round(payload["tes_score"] * 25, 2),
+            "latency_ms": round(random.uniform(50, 800), 2),
+            "req_per_sec": random.randint(50, 1000),
+            "re_score":   round(payload["re_score"] * 100, 2),
+        })
+    import pandas as pd
+    return pd.DataFrame(rows)
 
 # Auto-refresh trigger (Day 2 feature)
 try:
@@ -241,10 +285,9 @@ with st.sidebar:
 
 
 # ── Load Data ───────────────────────────────────────────────
-metrics = generate_service_metrics(n_services)
 threats = generate_threat_ips()
 incidents = generate_incident_log()
-data = compute_re_scores(metrics, threats)
+data = generate_real_data(n_services, scenario)
 
 
 # ── PDF Export ──────────────────────────────────────────────

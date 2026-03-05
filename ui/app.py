@@ -9,6 +9,7 @@ from visuals.heatmap import build_aura_heatmap
 from visuals.timeline import build_timeline_chart
 from visuals.graph_view import build_dependency_graph
 
+from core.auto_remediate import auto_remediate, get_remediation_log, get_system_status
 from core.mock_data import (
     generate_threat_ips,
     generate_incident_log,
@@ -331,7 +332,17 @@ with st.sidebar:
 # ── Load Data ───────────────────────────────────────────────
 threats = generate_threat_ips()
 incidents = generate_incident_log()
-data = generate_real_data(n_services, scenario)
+from core.real_metrics import get_real_metrics, compute_re_from_real
+raw = get_real_metrics(n_services)
+data = compute_re_from_real(raw)
+if scenario == "DDoS Attack":
+    data["re_score"] = (data["re_score"] * 1.4).clip(upper=100)
+elif scenario == "Config Drift":
+    data["re_score"] = (data["re_score"] * 1.2).clip(upper=100)
+elif scenario == "Brute Force":
+    data["re_score"] = (data["re_score"] * 1.3).clip(upper=100)
+elif scenario == "Data Exfiltration":
+    data["re_score"] = (data["re_score"] * 1.5).clip(upper=100)
 
 
 # ── PDF Export ──────────────────────────────────────────────
@@ -351,6 +362,12 @@ with st.sidebar:
 
     st.markdown("---")
 
+
+# ── Auto Remediation ────────────────────────────────────────────
+data, auto_actions = auto_remediate(data, critical_threshold)
+if auto_actions:
+    for act in auto_actions:
+        st.toast(f"AUTO-FIXED {act['service']}: RE {act['re_before']} -> {act['re_after']}")
 
 # ── Scenario Modifiers ──────────────────────────────────────
 if scenario == "DDoS Attack":
@@ -578,3 +595,23 @@ graph_fig = build_dependency_graph(
 )
 
 st.plotly_chart(graph_fig, use_container_width=True)
+
+# ── Auto-Remediation Log ────────────────────────────────────────────
+st.markdown('---')
+st.markdown('### Auto-Remediation Log')
+rem_log = get_remediation_log()
+if rem_log.empty:
+    st.success('No interventions triggered this session - system stable.')
+else:
+    for _, row in rem_log.iterrows():
+        color = '#ef4444' if row['severity'] == 'CRITICAL' else '#f97316'
+        st.markdown(
+            f'<div style="background:#0f172a; border-left:4px solid {color}; '
+            f'padding:10px 16px; border-radius:6px; margin-bottom:8px;">'
+            f'<span style="color:#9CA3AF; font-size:12px;">{row["timestamp"]}</span>'
+            f'<span style="color:white; font-weight:bold; margin-left:12px;">{row["service"]}</span>'
+            f'<span style="color:{color}; margin-left:12px;">RE: {row["re_before"]} -> {row["re_after"]}</span>'
+            f'<div style="color:#d1d5db; font-size:13px; margin-top:4px;">{row["action"]}</div>'
+            f'</div>',
+            unsafe_allow_html=True
+        )

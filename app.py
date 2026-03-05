@@ -5,6 +5,8 @@ import plotly.graph_objects as go
 import networkx as nx
 import matplotlib.pyplot as plt
 from re_engine import compute_re_score  # Your working engine!
+from shared_schema import create_mock_payload
+
 
 st.title("🚨 AREE — Risk Evolution Engine")
 
@@ -15,7 +17,11 @@ service_name = st.sidebar.text_input("Service", "api-svc-01")
 
 # Real-time RE Calculation
 if st.sidebar.button("🔍 SCAN SERVICE"):
-    result = compute_re_score(service_name, latency_slider)
+    payload = create_mock_payload(service_name)
+    payload["oss_score"] = 0.8 - (latency_slider / 10000)
+    payload["tes_score"] = 0.6  
+    payload = compute_re_score(payload)
+    result = payload  # Now works with existing code
     st.metric("RE Score", f"{result['re_score']:.1%}", delta=None)
     st.metric("Status", result['aura_level'])
     st.metric("Action", result['action'])

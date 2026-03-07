@@ -2,13 +2,14 @@
 AREE — Real System Monitor
 Tracks: CPU, RAM, Disk, Network, Processes
 Works on: Windows, Linux, MacOS
-Install: pip install psutil
+Install: pip install psutil requests
 """
 
 import psutil
 import time
 import platform
 import subprocess
+import requests
 from datetime import datetime
 
 
@@ -16,13 +17,13 @@ from datetime import datetime
 # CONFIGURATION
 # ─────────────────────────────────────────
 MONITOR_CONFIG = {
-    "poll_interval_seconds": 5,       # How often to collect metrics
-    "network_interface": None,        # None = auto-detect best interface
-    "high_cpu_threshold": 85,         # % CPU — triggers warning
-    "high_ram_threshold": 85,         # % RAM — triggers warning
-    "high_disk_threshold": 90,        # % Disk — triggers warning
-    "latency_test_host": "8.8.8.8",   # Google DNS — for network latency ping
-    "top_processes_count": 10,        # How many top processes to track
+    "poll_interval_seconds": 5,
+    "network_interface": None,
+    "high_cpu_threshold": 85,
+    "high_ram_threshold": 85,
+    "high_disk_threshold": 90,
+    "latency_test_host": "8.8.8.8",
+    "top_processes_count": 10,
 }
 
 
@@ -30,13 +31,15 @@ MONITOR_CONFIG = {
 # 1. CPU MONITORING
 # ─────────────────────────────────────────
 def get_cpu_metrics() -> dict:
-    """Returns detailed CPU usage metrics."""
-    cpu_percent_per_core = psutil.cpu_percent(interval=1, percpu=True)
+    """Returns detailed CPU usage metrics — single accurate reading."""
+    # ONE call with interval — this is the accurate reading, reused everywhere
+    cpu_total = psutil.cpu_percent(interval=1)
+    cpu_percent_per_core = psutil.cpu_percent(interval=None, percpu=True)
     cpu_freq = psutil.cpu_freq()
     load_avg = psutil.getloadavg() if hasattr(psutil, "getloadavg") else (0, 0, 0)
 
     return {
-        "cpu_total_percent": psutil.cpu_percent(interval=1),
+        "cpu_total_percent": cpu_total,
         "cpu_per_core": cpu_percent_per_core,
         "cpu_core_count": psutil.cpu_count(logical=True),
         "cpu_physical_cores": psutil.cpu_count(logical=False),
@@ -45,8 +48,8 @@ def get_cpu_metrics() -> dict:
         "load_avg_1min": round(load_avg[0], 2),
         "load_avg_5min": round(load_avg[1], 2),
         "load_avg_15min": round(load_avg[2], 2),
-        "status": "CRITICAL" if psutil.cpu_percent() > MONITOR_CONFIG["high_cpu_threshold"]
-                  else "WARNING" if psutil.cpu_percent() > 70
+        "status": "CRITICAL" if cpu_total > MONITOR_CONFIG["high_cpu_threshold"]
+                  else "WARNING" if cpu_total > 70
                   else "NORMAL",
     }
 
@@ -98,7 +101,6 @@ def get_disk_metrics() -> dict:
         except PermissionError:
             continue
 
-    # Disk I/O counters
     disk_io = psutil.disk_io_counters()
     io_metrics = {}
     if disk_io:
@@ -122,7 +124,20 @@ def get_disk_metrics() -> dict:
 # 4. NETWORK MONITORING
 # ─────────────────────────────────────────
 def get_network_latency_ms(host: str = "8.8.8.8") -> float:
-    """Pings a host and returns latency in ms. Works on Windows & Linux."""
+    """
+    Measures real HTTP latency to multiple endpoints.
+    Falls back to ping if HTTP fails.
+    Returns -1.0 only if truly unreachable.
+    """
+    # Try HTTP first — most accurate and works even when ICMP ping is blocked
+    for url in ["https://www.google.com", "https://www.cloudflare.com", "https://one.one.one.one"]:
+        try:
+            r = requests.get(url, timeout=3)
+            return round(r.elapsed.total_seconds() * 1000, 1)
+        except Exception:
+            continue
+
+    # Fallback: ICMP ping
     try:
         if platform.system().lower() == "windows":
             cmd = ["ping", "-n", "1", host]
@@ -132,10 +147,9 @@ def get_network_latency_ms(host: str = "8.8.8.8") -> float:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
         output = result.stdout
 
-        # Parse latency from ping output
         if platform.system().lower() == "windows":
             for line in output.splitlines():
-                if "Average" in line or "avg" in line.lower():
+                if "Average" in line:
                     parts = line.split("=")
                     if len(parts) > 1:
                         return float(parts[-1].replace("ms", "").strip())
@@ -147,7 +161,8 @@ def get_network_latency_ms(host: str = "8.8.8.8") -> float:
                         return float(parts[4])
     except Exception:
         pass
-    return -1.0  # -1 means unreachable
+
+    return -1.0  # truly unreachable
 
 
 def get_network_metrics() -> dict:
@@ -178,7 +193,7 @@ def get_network_metrics() -> dict:
         "dropped_out": net_io.dropout,
         "latency_ms": latency,
         "interfaces": interfaces,
-        "status": "CRITICAL" if latency > 500 or latency == -1
+        "status": "CRITICAL" if latency < 0 or latency > 500
                   else "WARNING" if latency > 150
                   else "NORMAL",
     }
@@ -206,13 +221,12 @@ def get_top_processes(n: int = 10) -> list:
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
 
-    # Sort by CPU usage descending
     procs.sort(key=lambda x: x["cpu_percent"], reverse=True)
     return procs[:n]
 
 
 def get_zombie_processes() -> list:
-    """Detects zombie/stuck processes that should be killed."""
+    """Detects zombie/stuck processes."""
     zombies = []
     for proc in psutil.process_iter(["pid", "name", "status"]):
         try:
@@ -247,7 +261,6 @@ def get_full_system_snapshot() -> dict:
         "zombie_processes": get_zombie_processes(),
     }
 
-    # Compute overall system Risk Energy (RE) score for AREE
     snapshot["risk_energy"] = compute_system_re(snapshot)
     snapshot["overall_status"] = (
         "CRITICAL" if snapshot["risk_energy"] > 75
@@ -259,16 +272,16 @@ def get_full_system_snapshot() -> dict:
 
 
 # ─────────────────────────────────────────
-# 7. RISK ENERGY CALCULATION (real metrics)
+# 7. RISK ENERGY CALCULATION
 # ─────────────────────────────────────────
 def compute_system_re(snapshot: dict) -> float:
     """
     Calculates AREE Risk Energy from real system metrics.
-    
+
     Formula:
       RE = (CPU*0.35) + (RAM*0.30) + (Disk*0.15) + (Network*0.20)
-    
-    Each component normalized to 0–100 scale.
+
+    Each component normalized to 0-100 scale.
     """
     cpu_score = snapshot["cpu"]["cpu_total_percent"]
 
@@ -278,14 +291,14 @@ def compute_system_re(snapshot: dict) -> float:
     disk_parts = snapshot["disk"]["partitions"]
     disk_score = max((p["percent_used"] for p in disk_parts), default=0)
 
-    # Network: normalize latency (0ms=0 risk, 1000ms=100 risk)
+    # Network: normalize latency to 0-100
     latency = snapshot["network"]["latency_ms"]
     if latency < 0:
-        net_score = 100  # unreachable = maximum risk
+        # Unknown/unreachable — use neutral score, don't spike RE falsely
+        net_score = 50
     else:
         net_score = min(100, (latency / 1000) * 100)
 
-    # Weighted RE
     re = (
         cpu_score  * 0.35 +
         ram_score  * 0.30 +
@@ -301,17 +314,9 @@ def compute_system_re(snapshot: dict) -> float:
 # ─────────────────────────────────────────
 def start_monitoring_loop(callback=None, stop_event=None):
     """
-    Runs continuous monitoring. 
+    Runs continuous monitoring.
     Pass a callback function to receive each snapshot.
     Pass a threading.Event to stop the loop gracefully.
-    
-    Usage:
-        import threading
-        stop = threading.Event()
-        thread = threading.Thread(target=start_monitoring_loop, 
-                                   args=(my_callback, stop))
-        thread.start()
-        # Later: stop.set()  to stop
     """
     print(f"[AREE Monitor] Started — polling every {MONITOR_CONFIG['poll_interval_seconds']}s")
     while True:
@@ -322,7 +327,6 @@ def start_monitoring_loop(callback=None, stop_event=None):
         if callback:
             callback(snapshot)
         else:
-            # Default: print summary
             print(
                 f"[{snapshot['timestamp']}] "
                 f"CPU={snapshot['cpu']['cpu_total_percent']}% | "

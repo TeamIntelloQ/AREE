@@ -6,21 +6,26 @@ from ml_engine import compute_ml_scores  # Optional pipeline
 def compute_re_score(service: str, latency: float):
     """Original signature - works with Deep's app.py"""
     oss = max(0.0, 1.0 - (latency / 2500.0))
-    tes = 0.4 + np.random.uniform(0.0, 0.6)
+
+    # FIX: TES based on latency instead of pure random — stable and realistic
+    # High latency = higher threat score
+    tes = min(1.0, 0.2 + (latency / 5000.0))
+
     re_score = oss * 0.6 + tes * 0.4
     re_score = min(1.0, re_score)
-    
+
     if re_score > 0.7:
-        aura_level, action = "🔴 RED", "🚨 AUTO-REMEDIATE"
+        aura_level, action = "red", "🚨 AUTO-REMEDIATE"
     elif re_score > 0.4:
-        aura_level, action = "🟠 ORANGE", "⚠️ WARNING"
+        aura_level, action = "orange", "⚠️ WARNING"
     else:
-        aura_level, action = "🟢 GREEN", "✅ MONITOR"
-    
+        aura_level, action = "green", "✅ MONITOR"
+
     return {
         "service": service, "oss": oss, "tes": tes,
         "re_score": re_score, "aura_level": aura_level, "action": action
     }
+
 
 # NEW PIPELINE MODE - for ml_engine integration
 def compute_re_pipeline(payload: ServicePayload):
@@ -29,15 +34,16 @@ def compute_re_pipeline(payload: ServicePayload):
     tes = payload["tes_score"]
     propagation_factor = 1.2
     payload["re_score"] = min(1.0, oss * tes * propagation_factor)
-    
+
     if payload["re_score"] > 0.7:
-        payload["aura_level"] = "🔴 RED"
+        payload["aura_level"] = "red"
     elif payload["re_score"] > 0.4:
-        payload["aura_level"] = "🟠 ORANGE"
+        payload["aura_level"] = "orange"
     else:
-        payload["aura_level"] = "🟢 GREEN"
-    
+        payload["aura_level"] = "green"
+
     return payload
+
 
 def chaos_test_re_engine():
     print("🚀 AREE RE ENGINE CHAOS TEST")
@@ -51,6 +57,7 @@ def chaos_test_re_engine():
         if result['re_score'] > 0.7:
             alerts += 1
     print(f"\n🎯 {alerts}/10 AUTO-REMEDIATED! 💥")
+
 
 if __name__ == "__main__":
     chaos_test_re_engine()

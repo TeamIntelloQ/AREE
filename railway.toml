@@ -3,7 +3,7 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "streamlit run ui/app.py --server.port=8501 --server.address=0.0.0.0 --server.headless=true"
+startCommand = "streamlit run ui/app.py --server.port=8080 --server.address=0.0.0.0 --server.headless=true"
 healthcheckPath = "/"
 healthcheckTimeout = 100
 restartPolicyType = "ON_FAILURE"

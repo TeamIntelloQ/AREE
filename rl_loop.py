@@ -1,3 +1,4 @@
+# rl_loop.py
 import sqlite3
 import json
 
@@ -30,12 +31,6 @@ def get_best_action(service, db_path="aree_memory.db"):
     conn.close()
     return row[0] if row else None
 
-if __name__ == "__main__":
-    w = [0.25, 0.35, 0.25, 0.15]
-    new_w = update_weights(w, pre_re=78, post_re=42)
-    print("Updated weights:", new_w)
-    log_episode("payment-service", 78, 42, "isolate", new_w)
-    print("Best action recall:", get_best_action("payment-service"))
 def init_db(db_path="aree_memory.db"):
     conn = sqlite3.connect(db_path)
     conn.execute("""
@@ -47,3 +42,10 @@ def init_db(db_path="aree_memory.db"):
     """)
     conn.commit()
     conn.close()
+
+if __name__ == "__main__":
+    w = [0.25, 0.35, 0.25, 0.15]
+    new_w = update_weights(w, pre_re=78, post_re=42)
+    print("Updated weights:", new_w)
+    log_episode("payment-service", 78, 42, "isolate", new_w)
+    print("Best action recall:", get_best_action("payment-service"))

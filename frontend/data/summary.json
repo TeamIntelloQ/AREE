@@ -1,0 +1,7 @@
+{
+  "peak_re": 74.4,
+  "peak_service": "auth_service",
+  "avg_re": 31.8,
+  "total_services": 6,
+  "total_timesteps": 60
+}

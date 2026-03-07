@@ -1,0 +1,47 @@
+[
+  {
+    "id":5,
+    "service":"auth_service",
+    "pre_re":74.36,
+    "post_re":68.11,
+    "action":"scale_replicas",
+    "weights":"[0.25, 0.3498, 0.25, 0.1502]",
+    "reward":6.25
+  },
+  {
+    "id":4,
+    "service":"auth_service",
+    "pre_re":74.36,
+    "post_re":68.11,
+    "action":"scale_replicas",
+    "weights":"[0.25, 0.3498, 0.25, 0.1502]",
+    "reward":6.25
+  },
+  {
+    "id":3,
+    "service":"auth_service",
+    "pre_re":74.36,
+    "post_re":68.11,
+    "action":"scale_replicas",
+    "weights":"[0.25, 0.3498, 0.25, 0.1502]",
+    "reward":6.25
+  },
+  {
+    "id":2,
+    "service":"auth_service",
+    "pre_re":74.36,
+    "post_re":68.11,
+    "action":"scale_replicas",
+    "weights":"[0.25, 0.3498, 0.25, 0.1502]",
+    "reward":6.25
+  },
+  {
+    "id":1,
+    "service":"auth_service",
+    "pre_re":74.36,
+    "post_re":68.11,
+    "action":"scale_replicas",
+    "weights":"[0.25, 0.3498, 0.25, 0.1502]",
+    "reward":6.25
+  }
+]

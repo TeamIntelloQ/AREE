@@ -21,6 +21,26 @@ from shared_schema import ServicePayload
 from ml_engine import compute_ml_scores
 from re_engine import compute_re_pipeline
 
+# ── Device Tracking Functions ──────────────────────
+def save_device_data(device_id, data):
+    path = f"data/device_{device_id}.json"
+    os.makedirs("data", exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(data, f)
+
+def load_device_data(device_id):
+    path = f"data/device_{device_id}.json"
+    if os.path.exists(path):
+        with open(path) as f:
+            return json.load(f)
+    return {}
+
+# ── Session Device ID ──────────────────────────────
+import streamlit as st
+if "device_id" not in st.session_state:
+    st.session_state.device_id = str(uuid.uuid4())[:8]
+device_id = st.session_state.device_id
+
 SERVICES = [
     "auth-service", "payment-gateway", "user-db", "api-gateway",
     "notification-svc", "order-service", "inventory-db", "logging-svc",
@@ -144,7 +164,7 @@ st.set_page_config(
     page_title="AREE - Risk Evolution Engine",
     page_icon="shield",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # ── Top Navigation Bar ───────────────────────────────────────

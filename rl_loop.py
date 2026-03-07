@@ -36,3 +36,14 @@ if __name__ == "__main__":
     print("Updated weights:", new_w)
     log_episode("payment-service", 78, 42, "isolate", new_w)
     print("Best action recall:", get_best_action("payment-service"))
+def init_db(db_path="aree_memory.db"):
+    conn = sqlite3.connect(db_path)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS episodes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            service TEXT, pre_re REAL, post_re REAL,
+            action TEXT, weights TEXT, reward REAL
+        )
+    """)
+    conn.commit()
+    conn.close()

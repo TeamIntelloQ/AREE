@@ -1,56 +1,65 @@
 import numpy as np
-from shared_schema import create_mock_payload, ServicePayload
-from ml_engine import compute_ml_scores  # Optional pipeline
+from graph_engine import build_service_graph, compute_dss_graph
 
-# BACKWARD COMPATIBLE - works with existing app.py
-def compute_re_score(service: str, latency: float):
-    """Original signature - works with Deep's app.py"""
-    oss = max(0.0, 1.0 - (latency / 2500.0))
-    tes = 0.4 + np.random.uniform(0.0, 0.6)
-    re_score = oss * 0.6 + tes * 0.4
-    re_score = min(1.0, re_score)
-    
-    if re_score > 0.7:
-        aura_level, action = "🔴 RED", "🚨 AUTO-REMEDIATE"
-    elif re_score > 0.4:
-        aura_level, action = "🟠 ORANGE", "⚠️ WARNING"
-    else:
-        aura_level, action = "🟢 GREEN", "✅ MONITOR"
-    
-    return {
-        "service": service, "oss": oss, "tes": tes,
-        "re_score": re_score, "aura_level": aura_level, "action": action
-    }
+G = build_service_graph()
 
-# NEW PIPELINE MODE - for ml_engine integration
-def compute_re_pipeline(payload: ServicePayload):
-    """New signature for ML→RE pipeline"""
-    oss = payload["oss_score"]
-    tes = payload["tes_score"]
-    propagation_factor = 1.2
-    payload["re_score"] = min(1.0, oss * tes * propagation_factor)
-    
-    if payload["re_score"] > 0.7:
-        payload["aura_level"] = "🔴 RED"
-    elif payload["re_score"] > 0.4:
-        payload["aura_level"] = "🟠 ORANGE"
-    else:
-        payload["aura_level"] = "🟢 GREEN"
-    
-    return payload
+def compute_oss(metrics):
+    cpu = metrics.get('cpu', 0)
+    latency = metrics.get('latency', 0)
+    oss = 1 - (cpu * 0.6 + (latency / 1000) * 0.4)
+    return round(max(0.0, min(1.0, oss)), 4)
 
-def chaos_test_re_engine():
-    print("🚀 AREE RE ENGINE CHAOS TEST")
-    alerts = 0
-    for i in range(10):
-        latency = np.random.uniform(500, 5000)
-        result = compute_re_score(f"SVC{i}", latency)
-        print(f"{result['service']:<6} Latency={latency:4.0f}ms  "
-              f"RE={result['re_score']:.1%}  "
-              f"{result['aura_level']}  {result['action']}")
-        if result['re_score'] > 0.7:
-            alerts += 1
-    print(f"\n🎯 {alerts}/10 AUTO-REMEDIATED! 💥")
+def compute_tes(threat):
+    return round(float(threat.get('ip_score', 0.0)), 4)
+
+def compute_dss(service_re_map=None, node="api-gateway"):
+    if service_re_map is None:
+        return 0.5
+    return compute_dss_graph(G, service_re_map, node)
+
+def compute_bcs():
+    return 0.8
+
+def compute_re(oss, tes, dss=None, bcs=None, weights=None):
+    if dss is None: dss = 0.5
+    if bcs is None: bcs = compute_bcs()
+    if weights is None: weights = [0.25, 0.25, 0.25, 0.25]
+    re = (oss * weights[0] +
+          tes * weights[1] +
+          dss * weights[2] +
+          bcs * weights[3])
+    return round(float(np.clip(re * 100, 0, 100)), 2)
+
 
 if __name__ == "__main__":
-    chaos_test_re_engine()
+    metrics = {"cpu": 0.85, "latency": 400}
+    threat  = {"ip_score": 0.9}
+    service_re_map = {
+        "payment-service": 80,
+        "db-primary": 65,
+        "auth-service": 30,
+        "redis-cache": 20,
+        "notification-service": 50,
+        "api-gateway": 45,
+        "ml-model-service": 35
+    }
+
+    oss = compute_oss(metrics)
+    tes = compute_tes(threat)
+    dss = compute_dss(service_re_map, "api-gateway")
+    bcs = compute_bcs()
+    re  = compute_re(oss, tes, dss, bcs)
+
+    print("=" * 40)
+    print(f"  OSS  (stability)  : {oss}")
+    print(f"  TES  (threat)     : {tes}")
+    print(f"  DSS  (graph real) : {dss}")
+    print(f"  BCS  (criticality): {bcs}")
+    print(f"  ➜ RE Score        : {re} / 100")
+    print("=" * 40)
+    if re >= 70:
+        print("  ⚠️  HIGH RISK — intervention needed!")
+    elif re >= 50:
+        print("  🟡 MEDIUM RISK — monitor closely.")
+    else:
+        print("  ✅ LOW RISK — stable.")

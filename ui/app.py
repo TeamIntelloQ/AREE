@@ -605,18 +605,24 @@ if real_monitor_toggle:
     proc_html += "</table>"
     st.markdown(proc_html, unsafe_allow_html=True)
 
-    # ── Disk bars ────────────────────────────────────────────
+    # ── Disk bars — read LIVE from psutil directly (per-device fix) ──
     st.markdown("#### 💾 Disk Usage")
-    for part in snap['disk']['partitions']:
-        d_c = "#ef4444" if part['percent_used']>90 else "#f97316" if part['percent_used']>75 else "#22c55e"
-        st.markdown(
-            f'<div style="margin-bottom:10px;">'
-            f'<div style="display:flex;justify-content:space-between;color:#9CA3AF;font-size:12px;">'
-            f'<span>💾 {part["mountpoint"]}</span>'
-            f'<span style="color:{d_c};">{part["percent_used"]}% used — {part["free_gb"]}GB free</span></div>'
-            f'<div style="background:#1f2937;border-radius:4px;height:8px;margin-top:4px;">'
-            f'<div style="width:{part["percent_used"]}%;background:{d_c};height:100%;border-radius:4px;"></div>'
-            f'</div></div>', unsafe_allow_html=True)
+    for _dp in _psutil.disk_partitions(all=False):
+        try:
+            _du = _psutil.disk_usage(_dp.mountpoint)
+            _pct = round(_du.percent, 1)
+            _free_gb = round(_du.free / (1024**3), 1)
+            d_c = "#ef4444" if _pct > 90 else "#f97316" if _pct > 75 else "#22c55e"
+            st.markdown(
+                f'<div style="margin-bottom:10px;">'
+                f'<div style="display:flex;justify-content:space-between;color:#9CA3AF;font-size:12px;">'
+                f'<span>💾 {_dp.mountpoint}</span>'
+                f'<span style="color:{d_c};">{_pct}% used — {_free_gb}GB free</span></div>'
+                f'<div style="background:#1f2937;border-radius:4px;height:8px;margin-top:4px;">'
+                f'<div style="width:{_pct}%;background:{d_c};height:100%;border-radius:4px;"></div>'
+                f'</div></div>', unsafe_allow_html=True)
+        except Exception:
+            continue
 
     # ── Real remediation result ──────────────────────────────
     real_result = check_and_remediate(snap)

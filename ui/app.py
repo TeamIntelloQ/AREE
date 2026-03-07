@@ -380,6 +380,12 @@ if real_monitor_toggle:
     st.markdown("### 🖥️ Live System Metrics")
 
     snap       = get_full_system_snapshot()
+    try:
+      import requests
+      r = requests.get("https://google.com", timeout=3)
+      lat = round(r.elapsed.total_seconds() * 1000, 1)
+    except:
+      lat = 0
     cpu        = snap['cpu']['cpu_total_percent']
     ram        = snap['ram']['ram_percent']
     lat        = snap['network']['latency_ms']
@@ -459,7 +465,9 @@ if real_monitor_toggle:
 
     # 5. Network
     if lat < 0:
-      pass
+        system_alerts.append({"level":"CRITICAL","icon":"🔴","metric":"NETWORK",
+            "msg":"Network unreachable — no internet connection",
+            "fix":auto_fix_network(),"status":"AUTO-FIXED ✅"})
     elif lat > 500:
         system_alerts.append({"level":"CRITICAL","icon":"🔴","metric":"NETWORK",
             "msg":f"Network latency critical ({lat}ms)",

@@ -163,7 +163,7 @@ def schedule_restart(delay_seconds, reason):
 
 # ── Page Config ─────────────────────────────────────────────
 st.set_page_config(
-    page_title="AREE - Risk Evolution Engine",
+    page_title="AREE | Autonomous Risk Engine",
     page_icon="shield",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -278,10 +278,10 @@ with st.sidebar:
         )])
         fig.update_layout(title="Chaos Test RE Scores", paper_bgcolor="#020617", font={"color":"white"})
         st.plotly_chart(fig, use_container_width=True)
-    st.caption("AREE v1.0 | Hackathon Build")
+    st.caption("AREE v1.0 | IntelloQ ")
     st.markdown("---")
     # ✅ Toggle is LAST item in sidebar
-    real_monitor_toggle = st.toggle("🖥️ Real System Monitor", value=False)
+    real_monitor_toggle = st.toggle("Real System Monitor", value=False)
 
 
 # ── Load Data ────────────────────────────────────────────────
@@ -377,7 +377,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 if real_monitor_toggle:
 
     st.markdown("---")
-    st.markdown("### 🖥️ Live System Metrics")
+    st.markdown(" Live System Metrics")
 
     snap       = get_full_system_snapshot()
     try:
@@ -401,7 +401,7 @@ if real_monitor_toggle:
     re_c  = "#ef4444" if re  > 75  else "#f97316" if re  > 45  else "#22c55e"
     s_c   = "#ef4444" if status == "CRITICAL" else "#f97316" if status == "WARNING" else "#22c55e"
 
-    st.markdown("#### 📊 Live Metrics")
+    st.markdown("Live Metrics")
     c1, c2, c3, c4 = st.columns(4)
     c1.markdown(f'<div style="background:#0f172a;border-left:4px solid {cpu_c};padding:14px;border-radius:8px;text-align:center;"><div style="color:#9CA3AF;font-size:12px;">⚡ CPU</div><div style="color:{cpu_c};font-size:32px;font-weight:bold;">{cpu}%</div><div style="color:#6B7280;font-size:11px;">{snap["cpu"]["cpu_core_count"]} cores</div></div>', unsafe_allow_html=True)
     c2.markdown(f'<div style="background:#0f172a;border-left:4px solid {ram_c};padding:14px;border-radius:8px;text-align:center;"><div style="color:#9CA3AF;font-size:12px;">🧠 RAM</div><div style="color:{ram_c};font-size:32px;font-weight:bold;">{ram}%</div><div style="color:#6B7280;font-size:11px;">{snap["ram"]["ram_used_gb"]}GB / {snap["ram"]["ram_total_gb"]}GB</div></div>', unsafe_allow_html=True)
@@ -599,7 +599,7 @@ if real_monitor_toggle:
     st.markdown(proc_html, unsafe_allow_html=True)
 
     # ── Disk bars ────────────────────────────────────────────
-    st.markdown("#### 💾 Disk Usage")
+    st.markdown(" Disk Usage")
     for part in snap['disk']['partitions']:
         d_c = "#ef4444" if part['percent_used']>90 else "#f97316" if part['percent_used']>75 else "#22c55e"
         st.markdown(
@@ -628,7 +628,7 @@ if real_monitor_toggle:
 # ═══════════════════════════════════════════════════════════
 
 st.markdown("---")
-st.markdown("### 🩺 System Health Score")
+st.markdown(" System Health Score")
 import plotly.graph_objects as go
 health_score = max(0, 100 - avg_re)
 gauge_fig = go.Figure(go.Indicator(

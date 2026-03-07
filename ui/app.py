@@ -38,7 +38,7 @@ def load_device_data(device_id):
 # ── Session Device ID ──────────────────────────────
 import streamlit as st
 if "device_id" not in st.session_state:
-    st.session_state.device_id = str(uuid.uuid4())[:8]
+    st.session_state.device_id = uuid.uuid4().hex[:8]
 device_id = st.session_state.device_id
 
 SERVICES = [

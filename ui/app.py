@@ -384,7 +384,6 @@ if real_monitor_toggle:
     st.markdown("### 🖥️ Live System Metrics")
 
     snap = get_full_system_snapshot()
-    inject_client_stats()
 
     # ── Multi-endpoint latency ping (FIX) ──────────────────
     lat = -1

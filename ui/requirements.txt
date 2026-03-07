@@ -1,0 +1,14 @@
+streamlit==1.32.0
+pandas
+numpy
+matplotlib
+seaborn
+plotly
+networkx
+faker
+scikit-learn
+xgboost
+scipy
+shap
+requests
+reportlab

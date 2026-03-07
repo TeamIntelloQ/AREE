@@ -63,3 +63,14 @@ if __name__ == "__main__":
         print("  🟡 MEDIUM RISK — monitor closely.")
     else:
         print("  ✅ LOW RISK — stable.")
+
+def compute_re_pipeline(service, metrics, threat, service_re_map=None):
+    oss = compute_oss(metrics)
+    tes = compute_tes(threat)
+    dss = compute_dss(service_re_map, service)
+    bcs = compute_bcs()
+    re  = compute_re(oss, tes, dss, bcs)
+    return {'oss': oss, 'tes': tes, 'dss': dss, 'bcs': bcs, 're_score': re}
+
+def compute_re_score(service, metrics, threat, service_re_map=None):
+    return compute_re_pipeline(service, metrics, threat, service_re_map)['re_score']

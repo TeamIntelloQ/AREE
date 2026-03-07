@@ -1,5 +1,4 @@
 import networkx as nx
-from graph_engine import build_service_graph, compute_dss_graph
 def build_service_graph():
     G = nx.DiGraph()
 

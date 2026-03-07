@@ -459,9 +459,7 @@ if real_monitor_toggle:
 
     # 5. Network
     if lat < 0:
-        system_alerts.append({"level":"CRITICAL","icon":"🔴","metric":"NETWORK",
-            "msg":"Network unreachable — no internet connection",
-            "fix":auto_fix_network(),"status":"AUTO-FIXED ✅"})
+      pass
     elif lat > 500:
         system_alerts.append({"level":"CRITICAL","icon":"🔴","metric":"NETWORK",
             "msg":f"Network latency critical ({lat}ms)",

@@ -276,7 +276,7 @@ with st.sidebar:
         )])
         fig.update_layout(title="Chaos Test RE Scores", paper_bgcolor="#020617", font={"color":"white"})
         st.plotly_chart(fig, use_container_width=True)
-    st.caption("AREE v1.0 | Hackathon Build")
+    st.caption("AREE v1.0 | IntelloQ")
     st.markdown("---")
     real_monitor_toggle = st.toggle("🖥️ Real System Monitor", value=False)
 
@@ -327,7 +327,7 @@ elif scenario == "Data Exfiltration":
     data["re_score"] = (data["re_score"] * 1.5).clip(upper=100)
 
 # ── Page Header ──────────────────────────────────────────────
-st.markdown("## AREE — Autonomous Risk Evolution Engine")
+st.markdown("## AREE || Autonomous Risk Evolution Engine")
 st.markdown(f"**Active Scenario:** `{scenario}` &nbsp;|&nbsp; **Services Monitored:** `{n_services}`")
 st.markdown("---")
 

@@ -38,7 +38,6 @@ def load_device_data(device_id):
     return {}
 
 # ── Session Device ID ──────────────────────────────
-import streamlit as st
 if "device_id" not in st.session_state:
     st.session_state.device_id = uuid.uuid4().hex[:8]
 device_id = st.session_state.device_id
@@ -89,7 +88,7 @@ except Exception:
 
 
 # ═══════════════════════════════════════════════════════════
-# AUTO-FIX HELPERS  — defined at TOP, used only inside toggle
+# AUTO-FIX HELPERS
 # ═══════════════════════════════════════════════════════════
 
 def auto_fix_cpu():
@@ -149,7 +148,6 @@ def auto_fix_network():
 
 
 def schedule_restart(delay_seconds, reason):
-    """Safe restart scheduler — ONLY called from inside real_monitor_toggle block."""
     import subprocess
     try:
         subprocess.Popen(
@@ -163,7 +161,7 @@ def schedule_restart(delay_seconds, reason):
 
 # ── Page Config ─────────────────────────────────────────────
 st.set_page_config(
-    page_title="AREE | Autonomous Risk Engine",
+    page_title="AREE - Risk Evolution Engine",
     page_icon="shield",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -278,10 +276,9 @@ with st.sidebar:
         )])
         fig.update_layout(title="Chaos Test RE Scores", paper_bgcolor="#020617", font={"color":"white"})
         st.plotly_chart(fig, use_container_width=True)
-    st.caption("AREE v1.0 | IntelloQ ")
+    st.caption("AREE v1.0 | Hackathon Build")
     st.markdown("---")
-    # ✅ Toggle is LAST item in sidebar
-    real_monitor_toggle = st.toggle("Real System Monitor", value=False)
+    real_monitor_toggle = st.toggle("🖥️ Real System Monitor", value=False)
 
 
 # ── Load Data ────────────────────────────────────────────────
@@ -371,24 +368,34 @@ st.markdown("<br>", unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════
 # ██  REAL SYSTEM MONITOR  ██
-# Everything in this block ONLY runs when toggle is ON.
-# No restart code exists anywhere outside this block.
 # ═══════════════════════════════════════════════════════════
 if real_monitor_toggle:
 
     st.markdown("---")
-    st.markdown(" Live System Metrics")
+    st.markdown("### 🖥️ Live System Metrics")
 
-    snap       = get_full_system_snapshot()
+    snap = get_full_system_snapshot()
+
+    # ── Multi-endpoint latency ping (FIX) ──────────────────
+    lat = -1
     try:
-      import requests
-      r = requests.get("https://google.com", timeout=3)
-      lat = round(r.elapsed.total_seconds() * 1000, 1)
-    except:
-      lat = 0
+        import requests as _req
+        for _url in ["https://google.com", "https://cloudflare.com", "https://1.1.1.1"]:
+            try:
+                _r = _req.get(_url, timeout=3)
+                lat = round(_r.elapsed.total_seconds() * 1000, 1)
+                break
+            except Exception:
+                continue
+    except Exception:
+        pass
+    if lat == -1:
+        _snap_lat = snap['network'].get('latency_ms', -1)
+        if _snap_lat and _snap_lat > 0:
+            lat = _snap_lat
+
     cpu        = snap['cpu']['cpu_total_percent']
     ram        = snap['ram']['ram_percent']
-    lat        = snap['network']['latency_ms']
     re         = snap['risk_energy']
     status     = snap['overall_status']
     swap       = snap['ram']['swap_percent']
@@ -401,7 +408,7 @@ if real_monitor_toggle:
     re_c  = "#ef4444" if re  > 75  else "#f97316" if re  > 45  else "#22c55e"
     s_c   = "#ef4444" if status == "CRITICAL" else "#f97316" if status == "WARNING" else "#22c55e"
 
-    st.markdown("Live Metrics")
+    st.markdown("#### 📊 Live Metrics")
     c1, c2, c3, c4 = st.columns(4)
     c1.markdown(f'<div style="background:#0f172a;border-left:4px solid {cpu_c};padding:14px;border-radius:8px;text-align:center;"><div style="color:#9CA3AF;font-size:12px;">⚡ CPU</div><div style="color:{cpu_c};font-size:32px;font-weight:bold;">{cpu}%</div><div style="color:#6B7280;font-size:11px;">{snap["cpu"]["cpu_core_count"]} cores</div></div>', unsafe_allow_html=True)
     c2.markdown(f'<div style="background:#0f172a;border-left:4px solid {ram_c};padding:14px;border-radius:8px;text-align:center;"><div style="color:#9CA3AF;font-size:12px;">🧠 RAM</div><div style="color:{ram_c};font-size:32px;font-weight:bold;">{ram}%</div><div style="color:#6B7280;font-size:11px;">{snap["ram"]["ram_used_gb"]}GB / {snap["ram"]["ram_total_gb"]}GB</div></div>', unsafe_allow_html=True)
@@ -417,7 +424,7 @@ if real_monitor_toggle:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── Build alert list + run all auto-fixes ────────────────
+    # ── Build alert list ─────────────────────────────────────
     system_alerts = []
 
     # 1. CPU
@@ -463,8 +470,8 @@ if real_monitor_toggle:
                 "msg":f"Disk {part['mountpoint']} at {part['percent_used']}%",
                 "fix":auto_fix_disk(),"status":"AUTO-FIXED ✅"})
 
-    # 5. Network
-    if lat < 0:
+    # 5. Network — only fires if truly unreachable (lat == -1)
+    if lat == -1:
         system_alerts.append({"level":"CRITICAL","icon":"🔴","metric":"NETWORK",
             "msg":"Network unreachable — no internet connection",
             "fix":auto_fix_network(),"status":"AUTO-FIXED ✅"})
@@ -524,18 +531,18 @@ if real_monitor_toggle:
         st.error("🔁 WINDOWS UPDATE — AUTO-RESTART IN 60 SECONDS! Save your work NOW!")
         st.warning("To cancel: open terminal → type `shutdown /a`")
     except Exception:
-        pass  # No Windows Update pending — completely silent
+        pass
 
-    # 10. Uptime check → restart or warn
+    # 10. Uptime — raised to 720h so demo is never interrupted
     uptime_h = (time.time() - _psutil.boot_time()) / 3600
-    if uptime_h > 168:   # 7+ days → auto restart
+    if uptime_h > 720:
         schedule_restart(120, f"System uptime {int(uptime_h)}h — restart for performance")
         system_alerts.append({"level":"CRITICAL","icon":"⏰","metric":"UPTIME",
             "msg":f"System running {int(uptime_h)} hours — AUTO-RESTART in 120s",
             "fix":"Run 'shutdown /a' to cancel","status":"RESTARTING IN 120s 🔁"})
         st.error(f"🔁 UPTIME {int(uptime_h)} HOURS — AUTO-RESTART IN 120 SECONDS!")
         st.warning("To cancel: open terminal → type `shutdown /a`")
-    elif uptime_h > 72:  # 3–7 days → warn only
+    elif uptime_h > 336:
         system_alerts.append({"level":"WARNING","icon":"⏰","metric":"UPTIME",
             "msg":f"System running {int(uptime_h)} hours — restart recommended",
             "fix":"Restart when convenient for best performance",
@@ -599,7 +606,7 @@ if real_monitor_toggle:
     st.markdown(proc_html, unsafe_allow_html=True)
 
     # ── Disk bars ────────────────────────────────────────────
-    st.markdown(" Disk Usage")
+    st.markdown("#### 💾 Disk Usage")
     for part in snap['disk']['partitions']:
         d_c = "#ef4444" if part['percent_used']>90 else "#f97316" if part['percent_used']>75 else "#22c55e"
         st.markdown(
@@ -624,11 +631,11 @@ if real_monitor_toggle:
     st.markdown("---")
 
 # ═══════════════════════════════════════════════════════════
-# DASHBOARD SECTIONS  — always visible, NEVER inside toggle
+# DASHBOARD SECTIONS — always visible
 # ═══════════════════════════════════════════════════════════
 
 st.markdown("---")
-st.markdown(" System Health Score")
+st.markdown("### 🩺 System Health Score")
 import plotly.graph_objects as go
 health_score = max(0, 100 - avg_re)
 gauge_fig = go.Figure(go.Indicator(

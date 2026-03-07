@@ -11,6 +11,8 @@ from real_monitor import get_full_system_snapshot
 from auto_remediate_real import check_and_remediate, get_remediation_log as get_real_remediation_log
 import streamlit as st
 import pandas as pd
+import plotly.express
+
 
 from utils.pdf_export import generate_pdf
 from visuals.timeline import build_timeline_chart
@@ -657,7 +659,7 @@ else:
             f'<div style="background:#0f172a;border-left:4px solid {color};'
             f'padding:10px 16px;border-radius:6px;margin-bottom:8px;">'
             f'<span style="color:#9CA3AF;font-size:12px;">{row.get("timestamp","")}</span>'
-            f'<span style="color:white;font-weight:bold;margin-left:12px;">{row.get("service","")}</span>'
+            f'<span style="color:white;font-weight:cat Procfilebold;margin-left:12px;">{row.get("service","")}</span>'
             f'<span style="color:{color};margin-left:12px;">'
             f'RE: {row.get("re_before","")} → {row.get("re_after","")}</span>'
             f'<div style="color:#d1d5db;font-size:13px;margin-top:4px;">{row.get("action","")}</div>'

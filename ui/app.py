@@ -8,7 +8,7 @@ import psutil as _psutil
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from real_monitor import get_full_system_snapshot, inject_client_stats
+from real_monitor import get_full_system_snapshot
 from auto_remediate_real import check_and_remediate, get_remediation_log as get_real_remediation_log
 import streamlit as st
 import pandas as pd

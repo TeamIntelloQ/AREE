@@ -189,6 +189,15 @@ st.markdown(
 
 # ── Custom CSS ───────────────────────────────────────────────
 st.markdown("""<style>
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&display=swap');
+
+h1, h2, h3, h4, h5, h6,
+.stMarkdown h1, .stMarkdown h2, .stMarkdown h3, .stMarkdown h4 {
+    font-family: 'Rajdhani', sans-serif !important;
+    font-weight: 700 !important;
+    letter-spacing: 1.5px !important;
+}
+
 .stApp {
     background: linear-gradient(-45deg,#020617,#0a1120,#071426,#020617);
     background-size: 300% 300%;
@@ -276,7 +285,7 @@ with st.sidebar:
         )])
         fig.update_layout(title="Chaos Test RE Scores", paper_bgcolor="#020617", font={"color":"white"})
         st.plotly_chart(fig, use_container_width=True)
-    st.caption("AREE v1.0 | IntelloQ")
+    st.caption("AREE v1.0 | Hackathon Build")
     st.markdown("---")
     real_monitor_toggle = st.toggle("🖥️ Real System Monitor", value=False)
 
@@ -327,7 +336,7 @@ elif scenario == "Data Exfiltration":
     data["re_score"] = (data["re_score"] * 1.5).clip(upper=100)
 
 # ── Page Header ──────────────────────────────────────────────
-st.markdown("## AREE || Autonomous Risk Evolution Engine")
+st.markdown("## AREE — Autonomous Risk Evolution Engine")
 st.markdown(f"**Active Scenario:** `{scenario}` &nbsp;|&nbsp; **Services Monitored:** `{n_services}`")
 st.markdown("---")
 

@@ -4,6 +4,7 @@ numpy
 matplotlib
 seaborn
 plotly
+psutil
 networkx
 faker
 scikit-learn

@@ -1,4 +1,5 @@
 import streamlit as st
+import uuid
 import json
 import numpy as np
 import plotly.graph_objects as go
@@ -10,6 +11,13 @@ from ml_engine import compute_ml_scores
 
 
 st.title("🚨 AREE — Risk Evolution Engine")
+
+# Generate unique user/device ID
+if "device_id" not in st.session_state:
+    st.session_state.device_id = str(uuid.uuid4())[:8]
+
+device_id = st.session_state.device_id
+st.sidebar.markdown(f"**Device ID:** `{device_id}`")
 
 # Sidebar Controls
 st.sidebar.header("Chaos Simulator")

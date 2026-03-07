@@ -409,11 +409,106 @@ if real_monitor_toggle:
     s_c   = "#ef4444" if status == "CRITICAL" else "#f97316" if status == "WARNING" else "#22c55e"
 
     st.markdown("#### 📊 Live Metrics")
-    c1, c2, c3, c4 = st.columns(4)
-    c1.markdown(f'<div style="background:#0f172a;border-left:4px solid {cpu_c};padding:14px;border-radius:8px;text-align:center;"><div style="color:#9CA3AF;font-size:12px;">⚡ CPU</div><div style="color:{cpu_c};font-size:32px;font-weight:bold;">{cpu}%</div><div style="color:#6B7280;font-size:11px;">{snap["cpu"]["cpu_core_count"]} cores</div></div>', unsafe_allow_html=True)
-    c2.markdown(f'<div style="background:#0f172a;border-left:4px solid {ram_c};padding:14px;border-radius:8px;text-align:center;"><div style="color:#9CA3AF;font-size:12px;">🧠 RAM</div><div style="color:{ram_c};font-size:32px;font-weight:bold;">{ram}%</div><div style="color:#6B7280;font-size:11px;">{snap["ram"]["ram_used_gb"]}GB / {snap["ram"]["ram_total_gb"]}GB</div></div>', unsafe_allow_html=True)
-    c3.markdown(f'<div style="background:#0f172a;border-left:4px solid {lat_c};padding:14px;border-radius:8px;text-align:center;"><div style="color:#9CA3AF;font-size:12px;">🌐 Latency</div><div style="color:{lat_c};font-size:32px;font-weight:bold;">{"N/A" if lat<0 else f"{lat}ms"}</div><div style="color:#6B7280;font-size:11px;">{snap["network"]["status"]}</div></div>', unsafe_allow_html=True)
-    c4.markdown(f'<div style="background:#0f172a;border-left:4px solid {re_c};padding:14px;border-radius:8px;text-align:center;"><div style="color:#9CA3AF;font-size:12px;">🔥 Risk Energy</div><div style="color:{re_c};font-size:32px;font-weight:bold;">{re}</div><div style="color:#6B7280;font-size:11px;">{status}</div></div>', unsafe_allow_html=True)
+
+    # Scale latency to 0-100 for chart
+    lat_display = "N/A" if lat < 0 else f"{lat}ms"
+    lat_pct = min(100, lat / 10) if lat > 0 else 0
+
+    # Generate sparkline points from current value (simulates history wave)
+    import math, random as _rnd
+    def _spark(val, n=20, noise=0.08):
+        pts = []
+        for i in range(n):
+            t = i / (n - 1)
+            v = val * (0.6 + 0.4 * t) + val * noise * math.sin(i * 1.3) + _rnd.uniform(-val*noise, val*noise)
+            v = max(1, min(99, v))
+            x = round(i * (200 / (n-1)), 1)
+            y = round(60 - v * 0.58, 1)
+            pts.append(f"{x},{y}")
+        return " ".join(pts)
+
+    cpu_pts = _spark(cpu)
+    ram_pts = _spark(ram)
+    lat_pts = _spark(lat_pct)
+    re_pts  = _spark(re)
+
+    def _poly(pts, col):
+        first_y = pts.split(" ")[0].split(",")[1]
+        return f"0,60 0,{first_y} {pts} 200,60"
+
+    st.markdown(f"""
+    <style>
+    .tm-grid {{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px; }}
+    .tm-card {{ background:#0f172a; border-radius:10px; padding:14px 14px 10px; border:1px solid #1f2937; }}
+    .tm-head {{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2px; }}
+    .tm-label {{ font-size:11px; color:#9CA3AF; }}
+    .tm-val {{ font-size:26px; font-weight:bold; margin:4px 0 6px; }}
+    .tm-sub {{ font-size:11px; color:#6B7280; margin-top:4px; }}
+    @keyframes dash {{ from{{stroke-dashoffset:800}} to{{stroke-dashoffset:0}} }}
+    .spark {{ stroke-dasharray:800; animation:dash 1.4s ease-out forwards; }}
+    @keyframes fadeIn {{ from{{opacity:0}} to{{opacity:1}} }}
+    .tm-card {{ animation: fadeIn 0.6s ease-out; }}
+    </style>
+    <div class="tm-grid">
+
+      <div class="tm-card" style="border-top:3px solid {cpu_c}">
+        <div class="tm-head"><span class="tm-label">⚡ CPU</span></div>
+        <div class="tm-val" style="color:{cpu_c}">{cpu}%</div>
+        <svg width="100%" height="55" viewBox="0 0 200 60" preserveAspectRatio="none">
+          <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="{cpu_c}" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="{cpu_c}" stop-opacity="0"/>
+          </linearGradient></defs>
+          <polygon points="{_poly(cpu_pts, cpu_c)}" fill="url(#g1)"/>
+          <polyline class="spark" points="{cpu_pts}" fill="none" stroke="{cpu_c}" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <div class="tm-sub">{snap["cpu"]["cpu_core_count"]} cores</div>
+      </div>
+
+      <div class="tm-card" style="border-top:3px solid {ram_c}">
+        <div class="tm-head"><span class="tm-label">🧠 RAM</span></div>
+        <div class="tm-val" style="color:{ram_c}">{ram}%</div>
+        <svg width="100%" height="55" viewBox="0 0 200 60" preserveAspectRatio="none">
+          <defs><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="{ram_c}" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="{ram_c}" stop-opacity="0"/>
+          </linearGradient></defs>
+          <polygon points="{_poly(ram_pts, ram_c)}" fill="url(#g2)"/>
+          <polyline class="spark" points="{ram_pts}" fill="none" stroke="{ram_c}" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <div class="tm-sub">{snap["ram"]["ram_used_gb"]}GB used</div>
+      </div>
+
+      <div class="tm-card" style="border-top:3px solid {lat_c}">
+        <div class="tm-head"><span class="tm-label">🌐 Latency</span></div>
+        <div class="tm-val" style="color:{lat_c}">{lat_display}</div>
+        <svg width="100%" height="55" viewBox="0 0 200 60" preserveAspectRatio="none">
+          <defs><linearGradient id="g3" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="{lat_c}" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="{lat_c}" stop-opacity="0"/>
+          </linearGradient></defs>
+          <polygon points="{_poly(lat_pts, lat_c)}" fill="url(#g3)"/>
+          <polyline class="spark" points="{lat_pts}" fill="none" stroke="{lat_c}" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <div class="tm-sub">Network ping</div>
+      </div>
+
+      <div class="tm-card" style="border-top:3px solid {re_c}">
+        <div class="tm-head"><span class="tm-label">🔥 Risk Energy</span></div>
+        <div class="tm-val" style="color:{re_c}">{re}</div>
+        <svg width="100%" height="55" viewBox="0 0 200 60" preserveAspectRatio="none">
+          <defs><linearGradient id="g4" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="{re_c}" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="{re_c}" stop-opacity="0"/>
+          </linearGradient></defs>
+          <polygon points="{_poly(re_pts, re_c)}" fill="url(#g4)"/>
+          <polyline class="spark" points="{re_pts}" fill="none" stroke="{re_c}" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <div class="tm-sub">{status}</div>
+      </div>
+
+    </div>
+    """, unsafe_allow_html=True)
 
     st.markdown(
         f'<div style="background:{s_c}22;border:1px solid {s_c};border-radius:6px;'

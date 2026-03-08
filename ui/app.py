@@ -253,6 +253,8 @@ with st.sidebar:
     st.subheader("Chaos Simulator")
     latency_slider = st.slider("Test Latency (ms)", 100, 5000, 2000)
     chaos_service  = st.text_input("Service Name", "api-svc-01")
+
+    # ── Scan Service ──────────────────────────────────────────
     if st.button("Scan Service", use_container_width=True):
         from shared_schema import create_mock_payload
         from re_engine import compute_re_score
@@ -260,10 +262,15 @@ with st.sidebar:
         payload["oss_score"] = max(0.1, 0.8 - (latency_slider / 10000))
         payload["tes_score"] = 0.6
         payload = compute_ml_scores(payload)
-        result  = compute_re_score(chaos_service, latency_slider)
-        st.metric("RE Score", f"{result['re_score']:.1%}")
-        st.metric("Status",   result['aura_level'])
-        st.metric("Action",   "auto-remediate" if result['aura_level'] == "red" else "observe")
+        metrics = {"cpu": payload["oss_score"], "latency": latency_slider}
+        threat  = {"ip_score": payload["tes_score"]}
+        re_val  = compute_re_score(chaos_service, metrics, threat)
+        aura    = "red" if re_val > 70 else "orange" if re_val > 45 else "green"
+        st.metric("RE Score", f"{re_val:.1f}")
+        st.metric("Status",   aura)
+        st.metric("Action",   "auto-remediate" if aura == "red" else "observe")
+
+    # ── Chaos Test ───────────────────────────────────────────
     if st.button("Chaos Test (10 svcs)", use_container_width=True):
         from re_engine import compute_re_score
         import numpy as np, plotly.graph_objects as go
@@ -272,19 +279,22 @@ with st.sidebar:
         for i in range(10):
             latency = np.random.uniform(500, 5000)
             svc_id  = f"SVC-{i}"
-            result  = compute_re_score(svc_id, latency)
-            chaos_data.append(result['re_score'])
-            emoji = "!!" if result['re_score'] > 0.7 else "OK"
-            st.write(f"**{svc_id}**: Latency={latency:.0f}ms -> RE={result['re_score']:.1%} [{emoji}]")
-            if result['re_score'] > 0.7:
+            metrics = {"cpu": np.random.uniform(0.2, 0.9), "latency": latency}
+            threat  = {"ip_score": np.random.uniform(0.3, 0.9)}
+            re_val  = compute_re_score(svc_id, metrics, threat)
+            chaos_data.append(re_val)
+            emoji = "!!" if re_val > 70 else "OK"
+            st.write(f"**{svc_id}**: Latency={latency:.0f}ms -> RE={re_val:.1f} [{emoji}]")
+            if re_val > 70:
                 alerts_count += 1
         st.success(f"{alerts_count}/10 HIGH-RISK -> AUTO-REMEDIATED!")
         fig = go.Figure(data=[go.Bar(
             x=[f"SVC-{i}" for i in range(10)], y=chaos_data,
-            marker_color=['red' if x > 0.7 else 'green' for x in chaos_data]
+            marker_color=['red' if x > 70 else 'green' for x in chaos_data]
         )])
         fig.update_layout(title="Chaos Test RE Scores", paper_bgcolor="#020617", font={"color":"white"})
         st.plotly_chart(fig, use_container_width=True)
+
     st.caption("AREE v1.0 | Hackathon Build")
     st.markdown("---")
     real_monitor_toggle = st.toggle("🖥️ Real System Monitor", value=False)
@@ -385,7 +395,7 @@ if real_monitor_toggle:
 
     snap = get_full_system_snapshot()
 
-    # ── Multi-endpoint latency ping (FIX) ──────────────────
+    # ── Multi-endpoint latency ping ─────────────────────────
     lat = -1
     try:
         import requests as _req
@@ -419,11 +429,9 @@ if real_monitor_toggle:
 
     st.markdown("#### 📊 Live Metrics")
 
-    # Scale latency to 0-100 for chart
     lat_display = "N/A" if lat < 0 else f"{lat}ms"
     lat_pct = min(100, lat / 10) if lat > 0 else 0
 
-    # Generate sparkline points from current value (simulates history wave)
     import math, random as _rnd
     def _spark(val, n=20, noise=0.08):
         pts = []
@@ -561,7 +569,7 @@ if real_monitor_toggle:
             "msg":f"Swap at {swap}% — disk used as RAM",
             "fix":auto_fix_ram(),"status":"AUTO-FIXED ✅"})
 
-    # 5. Network — only fires if truly unreachable (lat == -1)
+    # 4. Network
     if lat == -1:
         system_alerts.append({"level":"CRITICAL","icon":"🔴","metric":"NETWORK",
             "msg":"Network unreachable — no internet connection",
@@ -575,7 +583,7 @@ if real_monitor_toggle:
             "msg":f"Network latency elevated ({lat}ms)",
             "fix":auto_fix_network(),"status":"AUTO-FIXED ✅"})
 
-    # 6. Risk Energy
+    # 5. Risk Energy
     if re > 75:
         system_alerts.append({"level":"CRITICAL","icon":"🚨","metric":"RISK ENERGY",
             "msg":f"Risk Energy CRITICAL ({re}) — cascading failure risk",
@@ -585,7 +593,7 @@ if real_monitor_toggle:
             "msg":f"Risk Energy WARNING ({re})",
             "fix":"Monitoring closely","status":"WATCHING 👁️"})
 
-    # 7. Zombie processes
+    # 6. Zombie processes
     if zombies:
         killed = []
         for z in zombies:
@@ -599,7 +607,7 @@ if real_monitor_toggle:
             "fix":f"Killed: {', '.join(killed) if killed else 'attempted'}",
             "status":"AUTO-FIXED ✅"})
 
-    # 8. Critical overload → restart
+    # 7. Critical overload → restart
     if cpu > 95 and re > 90:
         schedule_restart(30, "Critical CPU+RE overload")
         system_alerts.append({"level":"CRITICAL","icon":"🔁","metric":"AUTO RESTART",
@@ -609,7 +617,7 @@ if real_monitor_toggle:
         st.error("🔁 CRITICAL OVERLOAD — AUTO-RESTART IN 30 SECONDS!")
         st.warning("To cancel: open terminal → type `shutdown /a`")
 
-    # 9. Windows Update → restart
+    # 8. Windows Update → restart
     try:
         import winreg
         winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
@@ -624,7 +632,7 @@ if real_monitor_toggle:
     except Exception:
         pass
 
-    # 10. Uptime — raised to 720h so demo is never interrupted
+    # 9. Uptime
     uptime_h = (time.time() - _psutil.boot_time()) / 3600
     if uptime_h > 720:
         schedule_restart(120, f"System uptime {int(uptime_h)}h — restart for performance")
@@ -695,8 +703,6 @@ if real_monitor_toggle:
                       f'<td style="text-align:right;padding:6px;color:#9CA3AF;">{p["status"]}</td></tr>')
     proc_html += "</table>"
     st.markdown(proc_html, unsafe_allow_html=True)
-
-
 
     # ── Real remediation result ──────────────────────────────
     real_result = check_and_remediate(snap)

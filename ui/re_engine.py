@@ -3,13 +3,17 @@ from shared_schema import create_mock_payload, ServicePayload
 from ml_engine import compute_ml_scores  # Optional pipeline
 
 # BACKWARD COMPATIBLE - works with existing app.py
-def compute_re_score(service: str, latency: float):
-    """Original signature - works with Deep's app.py"""
+def compute_re_score(service: str, latency: float, threat: float = None):
+    """Original signature - works with Deep's app.py
+    threat is optional — if not provided, it is derived from latency.
+    """
     oss = max(0.0, 1.0 - (latency / 2500.0))
 
-    # FIX: TES based on latency instead of pure random — stable and realistic
-    # High latency = higher threat score
-    tes = min(1.0, 0.2 + (latency / 5000.0))
+    # If threat not passed, derive it from latency (original behaviour)
+    if threat is None:
+        tes = min(1.0, 0.2 + (latency / 5000.0))
+    else:
+        tes = max(0.0, min(1.0, threat))
 
     re_score = oss * 0.6 + tes * 0.4
     re_score = min(1.0, re_score)
